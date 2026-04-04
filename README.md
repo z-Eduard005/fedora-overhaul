@@ -1,9 +1,9 @@
-# My all-in-one instruction how to install fedora linux, easy way, with all benefits.
+# My all-in-one instructions on how to install Fedora Linux the easy way, with all the benefits.
 
 ## You can use this order:
-1. **`dualboot-install.md`** (install fedora near your windows os, with no risk)
-2. **`post-install.md`** (basic post install instruction)
-3. **`programs/*.md`** (other program settings recomendation)
+1. **`dualboot-install.md`** (install Fedora alongside your Windows OS, with no risk)
+2. **`post-install.md`** (basic post-install instructions)
+3. **`programs/*.md`** (other program settings recommendations)
 4. **`optional-settings.md`** (my suggestions)
 
-### Fedora can be easyly installed without any help, but i guess this instruction will be helpful for linux beginers and can save some time figuring out things you dont even expect in new OS.
+### Fedora can be easily installed without any help, but I think this instruction will be helpful for Linux beginners and can save some time figuring out things you don't even expect in a new OS.
