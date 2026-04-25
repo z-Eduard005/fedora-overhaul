@@ -1,4 +1,4 @@
-# Installation alongside Windows OS
+# Installation alongside Windows
 
 ## Windows
 1. Fully update the system with system updates and Microsoft Store updates

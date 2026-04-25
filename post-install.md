@@ -21,7 +21,7 @@
 2. **Extension Manager** (flathub) - **`programs/extension-manager.md`**
 5. **Bottles** (flathub) - **`programs/bottles.md`**
 6. **Steam** (rpm) - **`programs/steam.md`**
-4. **Easy Effects** (flatpak) - simple audio
+4. **Easy Effects** (flatpak) - simple audio options
 7. **qBittorrent** (flatpak) - torrent manager
 3. **LACT** (flathub) - manage your AMD external video card
 
