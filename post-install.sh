@@ -134,8 +134,8 @@ mkdir -p "$WALLPAPERS_DIR"
 curl -fsSL "$WALLPAPERS_URL/$WALLPAPER_NAME" -o "$WALLPAPERS_DIR/$WALLPAPER_NAME"
 
 WALLPAPER="file://$WALLPAPERS_DIR/$WALLPAPER_NAME"
-gsettings set org.gnome.desktop.background picture-uri "file://$WALLPAPER"
-gsettings set org.gnome.desktop.background picture-uri-dark "file://$WALLPAPER"
+gsettings set org.gnome.desktop.background picture-uri "$WALLPAPER"
+gsettings set org.gnome.desktop.background picture-uri-dark "$WALLPAPER"
 
 gsettings set org.gnome.shell favorite-apps "['org.gnome.Ptyxis.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Settings.desktop', 'com.mattjakeman.ExtensionManager.desktop', 'org.gnome.Software.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.SystemMonitor.desktop', 'org.mozilla.firefox.desktop', 'steam.desktop']"
 
