@@ -13,6 +13,12 @@ DNF_CONF="/etc/dnf/dnf.conf"
 SCRIPT_DATA_DIR="$HOME/.local/share/z-Eduard005-fedora-post-install"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 
+REMOVE_PKGS=(gnome-tour baobab malcontent-control yelp)
+DNF_PKGS=(python3-pip zsh gnome-tweaks steam)
+CODEC_PKGS=(x264 obs-studio-plugin-x264)
+FLATHUB_PKGS=(com.mattjakeman.ExtensionManager com.usebottles.bottles)
+FLATPAK_PKGS=(com.github.neithern.g4music)
+
 success() { printf "\033[1;32m%s\033[0m" "$1"; }
 err() { printf "\033[1;31m%s\033[0m" "$1"; }
 warn() { printf "\033[1;33m%s\033[0m" "$1"; }
@@ -72,11 +78,29 @@ fi
 step="[4|13]: Installing essential codecs"
 if ! grep -qxF "$step" "$STATE_FILE"; then
   echo "$(info "$step")"
-  sudo dnf install -y x264 obs-studio-plugin-x264 --allowerasing
+  sudo dnf install -y "${CODEC_PKGS[@]}" --allowerasing
   echo "$step" >> "$STATE_FILE"
 fi
 
-step="[5|13]: Make the system start faster"
+step="[5|13]: Installing essential programs"
+if ! grep -qxF "$step" "$STATE_FILE"; then
+  echo "$(info "$step")"
+  sudo dnf install -y "${DNF_PKGS[@]}"
+  sudo flatpak install -y flathub "${FLATHUB_PKGS[@]}"
+  sudo flatpak install -y fedora "${FLATPAK_PKGS[@]}"
+  pip3 install $(basename $EXT_CLI)
+  eval "$OMZ_INSTALLER"
+  echo "$step" >> "$STATE_FILE"
+fi
+
+step="[6|13]: Removing unnecessary programs"
+if ! grep -qxF "$step" "$STATE_FILE"; then
+  echo "$(info "$step")"
+  sudo dnf remove -y "${REMOVE_PKGS[@]}"
+  echo "$step" >> "$STATE_FILE"
+fi
+
+step="[7|13]: Make the system start faster"
 if ! grep -qxF "$step" "$STATE_FILE"; then
   echo "$(info "$step")"
   sudo sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/' /etc/default/grub
@@ -84,12 +108,8 @@ if ! grep -qxF "$step" "$STATE_FILE"; then
   echo "$step" >> "$STATE_FILE"
 fi
 
-step="[6|13]: Installing Terminal utilities"
+step="[8|13]: Tweaking terminal"
 if ! grep -qxF "$step" "$STATE_FILE"; then
-  echo "$(info "$step")"
-  sudo dnf install -y python3-pip zsh
-  pip3 install gnome-extensions-cli
-  eval "$OMZ_INSTALLER"
   if ! grep -q 'source ~/.bashrc' "$HOME/.zshrc"; then
     echo -e "\n# Source the .bashrc config\n[ -f ~/.bashrc ] && source ~/.bashrc" >> "$HOME/.zshrc"
   fi
@@ -100,30 +120,14 @@ if ! grep -qxF "$step" "$STATE_FILE"; then
   echo "$step" >> "$STATE_FILE"
 fi
 
-step="[7|13]: Changing default music app"
+step="[9|13]: Changing default music app"
 if ! grep -qxF "$step" "$STATE_FILE"; then
   echo "$(info "$step")"
-  sudo flatpak install -y fedora com.github.neithern.g4music
   xdg-mime default com.github.neithern.g4music.desktop audio/mpeg audio/flac audio/x-wav audio/ogg
   echo "$step" >> "$STATE_FILE"
 fi
 
-step="[8|13]: Installing essential programs"
-if ! grep -qxF "$step" "$STATE_FILE"; then
-  echo "$(info "$step")"
-  sudo dnf install -y gnome-tweaks steam
-  sudo flatpak install -y flathub com.mattjakeman.ExtensionManager com.usebottles.bottles
-  echo "$step" >> "$STATE_FILE"
-fi
-
-step="[9|13]: Removing unnecessary programs"
-if ! grep -qxF "$step" "$STATE_FILE"; then
-  echo "$(info "$step")"
-  sudo dnf remove -y gnome-tour baobab malcontent-control yelp
-  echo "$step" >> "$STATE_FILE"
-fi
-
-step="[10|13]: Tweaking system settings a bit"
+step="[10|13]: Tweaking system settings"
 if ! grep -qxF "$step" "$STATE_FILE"; then
   echo "$(info "$step")"
   powerprofilesctl set performance
@@ -184,7 +188,7 @@ PROGRAMS=$(zenity --list --checklist \
   FALSE "minecraft"       "Minecraft (FREE VERSION)" \
   FALSE "youtube-music"   "YouTube Music App" \
   FALSE "vicinae"         "Vicinae - launcher & clipboard manager" \
-  FALSE "obs-hotkeys"     "Fix OBS recording hotkeys" \
+  FALSE "obs-hotkeys"     "Fix OBS recording hotkeys (you want this if you will record with obs)" \
   --width=960 --height=540)
 
 [ $? -ne 0 ] && { echo "$(err "Cancelled")"; exit 1; }
@@ -244,8 +248,7 @@ fi
 
 if selected "minecraft"; then
   if ! eval "$MC_INSTALLER"; then
-    echo "$(err "Minecraft installation failed. Try later by running this script:")"
-    echo "$(info "$MC_INSTALLER")"
+    echo "$(err "Minecraft installation failed. Try later by running this script again")"
   fi
 fi
 
@@ -259,11 +262,15 @@ if selected "youtube-music"; then
 fi
 
 if selected "vicinae"; then
-  eval "$VICINAE_INSTALLER"
+  if ! eval "$VICINAE_INSTALLER"; then
+    echo "$(err "Vicinae installation failed. Try later by running this script again")"
+  fi
 fi
 
 if selected "obs-hotkeys"; then
-  eval $OBS_HOTKEYS_INSTALLER
+  if ! eval "$OBS_HOTKEYS_INSTALLER"; then
+    echo "$(err "OBS Hotkeys installation failed. Try later by running this script again")"
+  fi
 fi
 
 zenity --info \
