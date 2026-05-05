@@ -80,7 +80,7 @@ run_the_step() {
   log_step
 }
 
-[ "$EUID" -eq 0 ] && echo "$(err 'Do not run this script with "sudo"!')" >&2; exit 1
+[ "$EUID" -eq 0 ] && { echo "$(err 'Do not run this script with "sudo"!')" >&2; exit 1; }
 
 sudo -v || exit 1
 while true; do
@@ -152,7 +152,6 @@ run_the_step && {
       for name in "${names[@]}"; do
         for against_key in "${!installed[@]}"; do
           [[ "$against_key" == "$install_key" ]] && continue
-          
           if grep -Fqx "$name" <<< "${installed[$against_key]}"; then
             conflict_key="$against_key"
             conflict_name="$name"
@@ -164,7 +163,7 @@ run_the_step && {
       add=true
       if [[ -n "$conflict_key" ]]; then
         echo "$(warn "'$conflict_name' already installed as $conflict_key")"
-        if ask_confirm "Reinstall as $install_key?"; then
+        if ask_confirm "Do you want to reinstall as $install_key? (this will delete app data)"; then
           eval "${remove_cmd[$conflict_key]} '$conflict_name'" || throw_err "Failed to remove $conflict_name"
         else
           add=false
