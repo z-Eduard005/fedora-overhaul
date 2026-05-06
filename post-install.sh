@@ -5,6 +5,7 @@ OBS_HOTKEYS_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-E
 VICINAE_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-vicinae-installer/main/install.sh)"'
 OMZ_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
 YTM_DOWNLOAD_URL="https://api.github.com/repos/pear-devs/pear-desktop/releases/latest"
+WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm"
 EXT_CLI="$HOME/.local/bin/gnome-extensions-cli"
 WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
@@ -14,26 +15,33 @@ ADWAITA_ACTIONS_ICONS_PATH="/usr/share/icons/Adwaita/scalable/actions"
 PROJECT_DIR="$HOME/Programs/fedora-post-install"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 DTP_CONF_PATH="/org/gnome/shell/extensions/dash-to-panel/"
+COMPLETE_SOUND_PATH="/usr/share/sounds/freedesktop/stereo/complete.oga"
 RPM_FUSION_PKGS=(
   "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
   "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 )
 REMOVE_PKGS=(gnome-tour baobab malcontent-control yelp)
-CODEC_PKGS=(x264 obs-studio-plugin-x264)
+MEDIA_CODEC_PKGS=(x264 obs-studio-plugin-x264)
 ALLOWERASING_DNF_PKGS=(power-profiles-daemon)
 DNF_PKGS=(
+  "fastfetch"
   "python3-pip"
   "zsh"
   "gnome-tweaks"
+  "curl"
+  "cabextract"
+  "xorg-x11-font-utils"
+  "fontconfig"
   "steam|com.valvesoftware.Steam"
 )
 FLATHUB_PKGS=(
   "com.mattjakeman.ExtensionManager|gnome-extensions-manager"
   "com.usebottles.bottles|bottles"
 )
-FLATPAK_PKGS=(
-  "com.github.neithern.g4music|g4music"
-)
+FLATPAK_PKGS=("com.github.neithern.g4music|g4music")
+NVIDIA_DRIVER_PKGS=(akmod-nvidia xorg-x11-drv-nvidia-cuda kernel-devel kernel-headers gcc make dkms acpid libglvnd-glx libglvnd-opengl libglvnd-devel pkgconfig egl-wayland)
+INTEL_DRIVER_PKGS=(intel-media-driver)
+AMD_DRIVER_SWAP_PKG=(mesa-va-drivers mesa-va-drivers-freeworld)
 
 success() { printf "\033[1;32m%s\033[0m" "$1"; }
 err() { printf "\033[1;31m%s\033[0m" "$1"; }
@@ -41,8 +49,8 @@ warn() { printf "\033[1;33m%s\033[0m" "$1"; }
 info() { printf "\033[1;34m%s\033[0m" "$1"; }
 
 throw_err() {
-  echo "$(err "$1")"
-  echo "$(warn "Try one more time...")"
+  echo -e "$(err "$1\nTry one more time...")"
+  pw-play "$COMPLETE_SOUND_PATH"
   zenity --info \
   --title="Error happend:" \
   --text="$1" \
@@ -69,6 +77,8 @@ set_dnf_conf_option() {
     echo "${key}=${value}" | sudo tee -a "$DNF_CONF" >/dev/null
   fi
 }
+
+is_gpu() { lspci | grep -Ei 'vga|3d|display' | grep -qi "$1"; }
 
 log_step() {
   echo "$(info "$step")"
@@ -119,16 +129,23 @@ sudo dnf upgrade -y --skip-unavailable && sudo flatpak update || {
   sudo all_proxy="socks5://127.0.0.1:9050" dnf upgrade --refresh -y --skip-unavailable
   sudo all_proxy="socks5://127.0.0.1:9050" flatpak update
 }
-sudo fwupdmgr refresh >/dev/null 2>&1 && sudo fwupdmgr update >/dev/null 2>&1
+sudo fwupdmgr refresh --force >/dev/null 2>&1
+sudo fwupdmgr update -y >/dev/null 2>&1
 
 step="[3|13]: Enabling the RPM Fusion repository (for more packages)"
 run_the_step && {
   sudo dnf install -y "${RPM_FUSION_PKGS[@]}" || throw_err "RPM Fusion enabling error"
 } && save_step
 
-step="[4|13]: Installing essential codecs"
+step="[4|13]: Installing essential drivers and codecs"
 run_the_step && {
-  sudo dnf install -y "${CODEC_PKGS[@]}" --allowerasing || throw_err "Error while installing codecs"
+  (
+    set -e
+    sudo dnf install -y "${MEDIA_CODEC_PKGS[@]}" --allowerasing
+    is_gpu "amd" && sudo dnf swap -y "${AMD_DRIVER_SWAP_PKG[@]}"
+    is_gpu "intel" && sudo dnf install -y "${INTEL_DRIVER_PKGS[@]}"
+    is_gpu "nvidia" && sudo dnf install -y "${NVIDIA_DRIVER_PKGS[@]}"
+  ) || throw_err "Error while installing essential drivers and codecs"
 } && save_step
 
 step="[5|13]: Installing essential programs"
@@ -202,6 +219,7 @@ run_the_step && {
     [[ ${#final_fedora[@]} -gt 0 ]] && sudo flatpak install -y fedora "${final_fedora[@]}"
     pip3 install "$(basename $EXT_CLI)"
     [ -d "$HOME/.oh-my-zsh" ] || eval "$OMZ_INSTALLER"
+    sudo rpm --nodigest -i "$WIN_FONTS_PKG"
   ) || throw_err "Error while installing essential programs"
 } && save_step
 
