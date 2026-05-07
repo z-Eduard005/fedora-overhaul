@@ -1,4 +1,7 @@
 #!/bin/bash
+export LANG=C
+export LC_ALL=C
+
 RAW_GITHUB="https://raw.githubusercontent.com/z-Eduard005/fedora-install/main"
 MC_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-mc-installer/main/mc-installer.sh)"'
 OBS_HOTKEYS_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-obs-hotkeys/main/install.sh)"'
@@ -11,11 +14,17 @@ WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
 CONF_FILENAMES=(dash-to-panel.conf view-app-grid-symbolic.svg registrymodifications.xcu)
 DNF_CONF="/etc/dnf/dnf.conf"
-ADWAITA_ACTIONS_ICONS_PATH="/usr/share/icons/Adwaita/scalable/actions"
+ADWAITA_ICONS_PATH="/usr/share/icons/Adwaita"
+ADWAITA_ACTIONS_ICONS_PATH="$ADWAITA_ICONS_PATH/scalable/actions"
 PROJECT_DIR="$HOME/Programs/fedora-post-install"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 DTP_CONF_PATH="/org/gnome/shell/extensions/dash-to-panel/"
 COMPLETE_SOUND_PATH="/usr/share/sounds/freedesktop/stereo/complete.oga"
+STEAMAPPS_PATH="$HOME/.steam/steam/steamapps"
+BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"
+SCX_LOADER_CONF="/etc/scx_loader.toml"
+KERNEL_POSTINST_DIR="/etc/kernel/postinst.d"
+NEWEST_CACHY_KERNEL="\$(ls /boot | grep 'vmlinuz.*cachy' | sort -V | tail -1)"
 RPM_FUSION_PKGS=(
   "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
   "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
@@ -42,15 +51,10 @@ FLATPAK_PKGS=("com.github.neithern.g4music|g4music")
 NVIDIA_DRIVER_PKGS=(akmod-nvidia xorg-x11-drv-nvidia-cuda kernel-devel kernel-headers gcc make dkms acpid libglvnd-glx libglvnd-opengl libglvnd-devel pkgconfig egl-wayland)
 INTEL_DRIVER_PKGS=(intel-media-driver)
 AMD_DRIVER_SWAP_PKG=(mesa-va-drivers mesa-va-drivers-freeworld)
-SCX_LOADER_CONF="/etc/scx_loader.toml"
-CACHY_COPRS=(
-  bieszczaders/kernel-cachyos
-  bieszczaders/kernel-cachyos-addons
-)
+CACHY_COPRS=("bieszczaders/kernel-cachyos" "bieszczaders/kernel-cachyos-addons")
 CACHY_PKGS=(kernel-cachyos kernel-cachyos-devel-matched)
 ALLOWERASING_CACHY_PKGS=(cachyos-settings scx-scheds-git scx-tools-git)
-KERNEL_POSTINST_DIR="/etc/kernel/postinst.d"
-NEWEST_CACHY_KERNEL="\$(ls /boot | grep 'vmlinuz.*cachy' | sort -V | tail -1)"
+TEMPLATE_FILENAMES=("Text_Document.txt" "Word_Document.docx" "Excel_Document.xlsx")
 
 success() { printf "\033[1;32m%s\033[0m" "$1"; }
 err() { printf "\033[1;31m%s\033[0m" "$1"; }
@@ -104,11 +108,11 @@ log_step() {
 }
 
 save_step() {
-  echo "$step" >> "$STATE_FILE"
+  echo "${step#*]: }" >> "$STATE_FILE"
 }
 
 is_step_done() {
-  grep -qxF "$step" "$STATE_FILE"
+  grep -qxF "${step#*]: }" "$STATE_FILE"
 }
 
 run_the_step() {
@@ -161,9 +165,15 @@ run_the_step && {
   (
     set -e
     sudo dnf install -y "${MEDIA_CODEC_PKGS[@]}" --allowerasing
-    is_gpu "amd" && sudo dnf swap -y "${AMD_DRIVER_SWAP_PKG[@]}"
-    is_gpu "intel" && sudo dnf install -y "${INTEL_DRIVER_PKGS[@]}"
-    is_gpu "nvidia" && sudo dnf install -y "${NVIDIA_DRIVER_PKGS[@]}"
+    if is_gpu "amd"; then
+      sudo dnf swap -y "${AMD_DRIVER_SWAP_PKG[@]}"
+    fi
+    if is_gpu "intel"; then
+      sudo dnf install -y "${INTEL_DRIVER_PKGS[@]}"
+    fi
+    if is_gpu "nvidia"; then
+      sudo dnf install -y "${NVIDIA_DRIVER_PKGS[@]}"
+    fi
   ) || throw_err "Error while installing essential drivers and codecs"
 } && save_step
 
@@ -310,6 +320,9 @@ run_the_step && {
   gsettings set org.gnome.desktop.wm.keybindings close "['<Alt>w']"
   gsettings set org.gnome.shell favorite-apps "['org.gnome.Ptyxis.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Settings.desktop', 'com.mattjakeman.ExtensionManager.desktop', 'org.gnome.Software.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.SystemMonitor.desktop', 'org.mozilla.firefox.desktop', 'steam.desktop']"
   gsettings set org.gnome.desktop.input-sources xkb-options "['grp:caps_toggle','lv3:ralt_switch']"
+  gsettings set org.gnome.nautilus.icon-view default-zoom-level 'small-plus'
+  gsettings set org.gnome.nautilus.list-view default-zoom-level 'medium'
+  gsettings set org.gnome.nautilus.preferences default-folder-viewer 'list-view'
 } && save_step
 
 step="[12|14]: Installing essential gnome extensions"
@@ -324,11 +337,25 @@ for f in "${WALLPAPER_FILENAMES[@]}"; do
   [ -f "$WALLPAPERS_DIR/$f" ] || curl -fsSL "$RAW_GITHUB/wallpapers/$f" -o "$WALLPAPERS_DIR/$f" || echo "$(warn "Wallpapers failed to install")"
 done
 for f in "${CONF_FILENAMES[@]}"; do
-  [ -f "$PROJECT_DIR/data/$f" ] || curl -fsSL "$RAW_GITHUB/conf/$f" -o "$PROJECT_DIR/data/$f" || throw_err 'Failed to download "$file"'
+  [ -f "$PROJECT_DIR/data/$f" ] || curl -fsSL "$RAW_GITHUB/data/$f" -o "$PROJECT_DIR/data/$f" || throw_err 'Failed to download "$file"'
 done
 
-step="Pre-configure registrymodifications.xcu"
+step="Pre-configuring libreoffice settings"
 ! is_step_done && cp "$PROJECT_DIR/data/registrymodifications.xcu" "$LIBREOFFICE_USER_DIR/registrymodifications.xcu" && save_step
+
+step="Creating template files"
+! is_step_done && {
+  for f in "${TEMPLATE_FILENAMES[@]}"; do
+    cp "$PROJECT_DIR/data/$f" "$HOME/Templates/$f"
+  done
+} && save_step
+
+step="Setting up additional nautilus bookmarks"
+! is_step_done && {
+  sed -i "1s|^|file://$STEAMAPPS_PATH Steamapps\n|" "$BOOKMARKS_FILE"
+  sed -i "1s|^|file://$WALLPAPERS_DIR Wallpapers\n|" "$BOOKMARKS_FILE"
+  nautilus -q >/dev/null 2>&1
+} && save_step
 
 SELECTED_LOOK=$(zenity --list --radiolist \
   --title="Desktop Look" \
@@ -391,25 +418,30 @@ esac
 }
 
 sudo cp "$PROJECT_DIR/data/view-app-grid-symbolic.svg" "$ADWAITA_ACTIONS_ICONS_PATH/view-app-grid-symbolic.svg"
-sudo gtk-update-icon-cache /usr/share/icons/Adwaita
+sudo gtk-update-icon-cache "$ADWAITA_ICONS_PATH"
+$EXT_CLI update >/dev/null 2>&1
 
 step="[14|14]: Installing selected programs"; log_step
 (
   set -e
   if selected "color-picker"; then
     $EXT_CLI install color-picker@tuberry
+    $EXT_CLI update color-picker@tuberry
     $EXT_CLI enable color-picker@tuberry
   fi
   if selected "rounded-corners"; then
     $EXT_CLI install rounded-window-corners@fxgn
+    $EXT_CLI update rounded-window-corners@fxgn
     $EXT_CLI enable rounded-window-corners@fxgn
   fi
   if selected "hidetopbar"; then
     $EXT_CLI install hidetopbar@mathieu.bidon.ca
+    $EXT_CLI update hidetopbar@mathieu.bidon.ca
     $EXT_CLI enable hidetopbar@mathieu.bidon.ca
   fi
   if selected "vitals"; then
     $EXT_CLI install Vitals@CoreCoding.com
+    $EXT_CLI update Vitals@CoreCoding.com
     $EXT_CLI enable Vitals@CoreCoding.com
   fi
 ) || echo "$(warn "Some extensions failed to enable. Try again")"
