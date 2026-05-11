@@ -3,7 +3,7 @@ set -uo pipefail
 export LANG=C
 export LC_ALL=C
 
-RAW_GITHUB="https://raw.githubusercontent.com/z-Eduard005/fedora-install/main"
+GITHUB_REPO="https://github.com/z-Eduard005/fedora-install.git"
 MC_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-mc-installer/main/mc-installer.sh)"'
 OBS_HOTKEYS_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-obs-hotkeys/main/install.sh)"'
 VICINAE_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-vicinae-installer/main/install.sh)"'
@@ -13,7 +13,6 @@ WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttc
 EXT_CLI="$HOME/.local/bin/gnome-extensions-cli"
 WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
-CONF_FILENAMES=(dash-to-panel.conf view-app-grid-symbolic.svg registrymodifications.xcu)
 DNF_CONF="/etc/dnf/dnf.conf"
 ADWAITA_ICONS_DIR="/usr/share/icons/Adwaita"
 ADWAITA_ACTIONS_ICONS_DIR="$ADWAITA_ICONS_DIR/scalable/actions"
@@ -138,7 +137,13 @@ while true; do
   kill -0 "$$" || exit
 done 2>/dev/null &
 
-sudo mkdir -p "$PROJECT_DIR/data" "$KERNEL_POSTINST_DIR" "$WALLPAPERS_DIR" "$ADWAITA_ACTIONS_ICONS_DIR" "$LIBREOFFICE_USER_DIR"
+step="[0|14]: Downloading the program data"
+run_the_step && {
+  rm -rf "$PROJECT_DIR"
+  git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR" || throw_err "Error while downloading the program data"
+  rm -rf "$PROJECT_DIR/.git/"
+  sudo mkdir -p "$KERNEL_POSTINST_DIR" "$WALLPAPERS_DIR" "$ADWAITA_ACTIONS_ICONS_DIR" "$LIBREOFFICE_USER_DIR"
+} && save_step
 
 step="[1|14]: Configuring system package manager"; log_step
 set_dnf_conf_option "max_parallel_downloads" "15"
@@ -342,10 +347,7 @@ run_the_step && {
 
 step="[13|14]: Setting up look of your desktop"; log_step
 for f in "${WALLPAPER_FILENAMES[@]}"; do
-  [ -f "$WALLPAPERS_DIR/$f" ] || curl -fsSL "$RAW_GITHUB/wallpapers/$f" -o "$WALLPAPERS_DIR/$f" || echo "$(warn "Wallpapers failed to install")"
-done
-for f in "${CONF_FILENAMES[@]}"; do
-  [ -f "$PROJECT_DIR/data/$f" ] || curl -fsSL "$RAW_GITHUB/data/$f" -o "$PROJECT_DIR/data/$f" || throw_err 'Failed to download "$file"'
+  cp "$PROJECT_DIR/data/$f" "$WALLPAPERS_DIR/$f"
 done
 
 SELECTED_LOOK=$(zenity --list --radiolist \

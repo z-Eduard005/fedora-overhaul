@@ -4,7 +4,7 @@
 1. **`dualboot-install.md`** (install Fedora alongside your Windows OS, with no risk)
 2. Post install script:
 ```bash
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-install/main/post-install.sh)"
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-install/main/script.sh)"
 ```
 3. **`programs/*.md`** (other program settings recommendations)
 
