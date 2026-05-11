@@ -137,7 +137,7 @@ while true; do
   kill -0 "$$" || exit
 done 2>/dev/null &
 
-step="[0|14]: Downloading the program data"
+step="[0|13]: Downloading the program data"
 run_the_step && {
   rm -rf "$PROJECT_DIR"
   git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR" || throw_err "Error while downloading the program data"
@@ -145,12 +145,12 @@ run_the_step && {
   sudo mkdir -p "$KERNEL_POSTINST_DIR" "$WALLPAPERS_DIR" "$ADWAITA_ACTIONS_ICONS_DIR" "$LIBREOFFICE_USER_DIR"
 } && save_step
 
-step="[1|14]: Configuring system package manager"; log_step
+step="[1|13]: Configuring system package manager"; log_step
 set_dnf_conf_option "max_parallel_downloads" "15"
 set_dnf_conf_option "fastestmirror" "True"
 set_dnf_conf_option "installonly_limit" "2"
 
-step="[2|14]: Updating the system"; log_step
+step="[2|13]: Updating the system"; log_step
 sudo dnf upgrade --refresh -y --skip-unavailable && sudo flatpak update || {
   sudo dnf install -y tor
   sudo systemctl start tor
@@ -160,15 +160,11 @@ sudo dnf upgrade --refresh -y --skip-unavailable && sudo flatpak update || {
 sudo fwupdmgr refresh --force >/dev/null 2>&1
 sudo fwupdmgr update -y >/dev/null 2>&1
 
-step="[3|14]: Enabling the RPM Fusion repository (for more packages)"
-run_the_step && {
-  sudo dnf install -y "${RPM_FUSION_PKGS[@]}" || throw_err "RPM Fusion enabling error"
-} && save_step
-
-step="[4|14]: Installing essential drivers and codecs"
+step="[3|13]: Installing essential drivers and codecs"
 run_the_step && {
   (
     set -e
+    sudo dnf install -y "${RPM_FUSION_PKGS[@]}"
     sudo dnf install -y "${MEDIA_CODEC_PKGS[@]}" --allowerasing
     if is_gpu "amd"; then
       sudo dnf swap -y "${AMD_DRIVER_SWAP_PKG[@]}"
@@ -182,7 +178,7 @@ run_the_step && {
   ) || throw_err "Error while installing essential drivers and codecs"
 } && save_step
 
-step="[5|14]: Installing cachyos kernel (for better performance)"
+step="[4|13]: Installing cachyos kernel (for better performance)"
 run_the_step && {
   (
     set -e
@@ -208,7 +204,7 @@ EOF
   ) || throw_err "Error while installing cachyos kernel"
 } && save_step
 
-step="[6|14]: Installing essential programs"
+step="[5|13]: Installing essential programs"
 run_the_step && {
   declare -A installed=(
     [rpm]="$(rpm -qa --qf '%{NAME}\n' 2>/dev/null)"
@@ -283,18 +279,18 @@ run_the_step && {
   ) || throw_err "Error while installing essential programs"
 } && save_step
 
-step="[7|14]: Removing unnecessary programs"
+step="[6|13]: Removing unnecessary programs"
 run_the_step && {
   sudo dnf remove -y "${REMOVE_PKGS[@]}" || throw_err "Error while removing unnecessary programs"
 } && save_step
 
-step="[8|14]: Make the system start faster"
+step="[7|13]: Make the system start faster"
 run_the_step && {
   sudo sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/' /etc/default/grub
   sudo grub2-mkconfig -o /boot/grub2/grub.cfg || throw_err "Error while generating grub config"
 } && save_step
 
-step="[9|14]: Tweaking terminal"
+step="[8|13]: Tweaking terminal"
 run_the_step && {
   if ! grep -q 'source ~/.bashrc' "$HOME/.zshrc"; then
     echo -e "\n# Source the .bashrc config\n[ -f ~/.bashrc ] && source ~/.bashrc" >> "$HOME/.zshrc"
@@ -305,12 +301,12 @@ run_the_step && {
   [ "$SHELL" != "$(which zsh)" ] && chsh -s "$(which zsh)"
 } && save_step
 
-step="[10|14]: Changing default music app"
+step="[9|13]: Changing default music app"
 run_the_step && {
   flatpak list --app | grep -q "com.github.neithern.g4music" && xdg-mime default com.github.neithern.g4music.desktop audio/mpeg audio/flac audio/x-wav audio/ogg || echo "$(warn "Failed to set default music app")"
 } && save_step
 
-step="[11|14]: Tweaking system settings"
+step="[10|13]: Tweaking system settings"
 run_the_step && {
   powerprofilesctl set performance >/dev/null 2>&1
   gsettings set org.gnome.desktop.interface enable-hot-corners false
@@ -339,13 +335,13 @@ run_the_step && {
   nautilus -q >/dev/null 2>&1
 } && save_step
 
-step="[12|14]: Installing essential gnome extensions"
+step="[11|13]: Installing essential gnome extensions"
 run_the_step && {
   $EXT_CLI install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com || throw_err "Error while installing gnome extensions"
   ext_cli_disable background-logo@fedorahosted.org Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com || echo "$(warn "Some extensions are not disabled, so you might see some visual issues, disable them, if you need, in Extensions Manager app")"
 } && save_step
 
-step="[13|14]: Setting up look of your desktop"; log_step
+step="[12|13]: Setting up look of your desktop"; log_step
 for f in "${WALLPAPER_FILENAMES[@]}"; do
   cp "$PROJECT_DIR/data/$f" "$WALLPAPERS_DIR/$f"
 done
@@ -414,7 +410,7 @@ sudo cp "$PROJECT_DIR/data/view-app-grid-symbolic.svg" "$ADWAITA_ACTIONS_ICONS_D
 sudo gtk-update-icon-cache "$ADWAITA_ICONS_DIR"
 $EXT_CLI update >/dev/null 2>&1
 
-step="[14|14]: Installing selected programs"; log_step
+step="[13|13]: Installing selected programs"; log_step
 (
   set -e
   if selected "color-picker"; then
