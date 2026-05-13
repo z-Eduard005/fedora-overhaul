@@ -3,7 +3,7 @@ set -uo pipefail
 export LANG=C
 export LC_ALL=C
 
-GITHUB_REPO="https://github.com/z-Eduard005/fedora-install.git"
+GITHUB_REPO="https://github.com/z-Eduard005/fedora-overhaul.git"
 MC_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-mc-installer/main/mc-installer.sh)"'
 OBS_HOTKEYS_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-obs-hotkeys/main/install.sh)"'
 VICINAE_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-vicinae-installer/main/install.sh)"'
