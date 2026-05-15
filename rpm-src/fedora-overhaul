@@ -6,4 +6,8 @@ if SCRIPT=$(curl -fsSL --connect-timeout 5 "$REMOTE_SCRIPT" 2>/dev/null); then
   echo "$SCRIPT" > "$LOCAL_SCRIPT"
 fi
 
-/bin/bash -l "$LOCAL_SCRIPT"
+if [ -n "$SUDO_USER" ]; then
+  exec sudo -u "$SUDO_USER" /bin/bash -l "$LOCAL_SCRIPT"
+else
+  exec /bin/bash -l "$LOCAL_SCRIPT"
+fi
