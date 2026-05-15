@@ -92,16 +92,6 @@ set_dnf_conf_option() {
   fi
 }
 
-set_scx_loader_option() {
-  local key="$1"
-  local value="$2"
-  if grep -qE "^${key}[[:space:]]*=" "$SCX_LOADER_CONF"; then
-    sudo sed -i "s|^${key}[[:space:]]*=.*|${key} = \"${value}\"|" "$SCX_LOADER_CONF"
-  else
-    sudo sed -i "1i${key} = \"${value}\"" "$SCX_LOADER_CONF"
-  fi
-}
-
 is_gpu() { lspci -d ::03xx | grep -qi "$1"; }
 
 log_step() {
@@ -148,6 +138,7 @@ run_the_step && {
   sudo mkdir -p "$PROJECT_DIR" "$KERNEL_POSTINST_DIR" "$WALLPAPERS_DIR" "$ADWAITA_ACTIONS_ICONS_DIR" "$LIBREOFFICE_USER_DIR"
   sudo git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR" || throw_err "Error while downloading the program data"
   sudo rm -rf "$PROJECT_DIR/.gitignore" "$PROJECT_DIR/.git/" "$PROJECT_DIR/docs/" "$PROJECT_DIR/rpmbuild/" "$PROJECT_DIR/build.sh"
+  sudo touch "$STATE_FILE"
 } && save_step
 
 step="[1|13]: Configuring system package manager"; log_step
@@ -203,9 +194,9 @@ EOF
 
     sudo dnf install -y "${ALLOWERASING_CACHY_PKGS[@]}" --allowerasing
     sudo dracut -f
+
     sudo scxctl start --sched lavd --mode gaming || sudo scxctl switch --sched lavd --mode gaming
-    set_scx_loader_option "default_sched" "scx_lavd"
-    set_scx_loader_option "default_mode" "Gaming"
+    echo -e 'default_sched = "scx_lavd"\ndefault_mode = "Gaming"' | sudo tee "$SCX_LOADER_CONF" > /dev/null
   ) || throw_err "Error while installing cachyos kernel"
 } && save_step
 

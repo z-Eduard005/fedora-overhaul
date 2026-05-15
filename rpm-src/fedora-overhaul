@@ -3,7 +3,7 @@ LOCAL_SCRIPT="/opt/fedora-overhaul/script.sh"
 REMOTE_SCRIPT="https://raw.githubusercontent.com/z-Eduard005/fedora-overhaul/main/script.sh"
 
 if SCRIPT=$(curl -fsSL --connect-timeout 5 "$REMOTE_SCRIPT" 2>/dev/null); then
-  echo "$SCRIPT" > "$LOCAL_SCRIPT"
+  echo "$SCRIPT" | sudo tee "$LOCAL_SCRIPT" > /dev/null
 fi
 
 if [ -n "$SUDO_USER" ]; then
