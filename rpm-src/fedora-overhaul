@@ -1,0 +1,9 @@
+#!/bin/bash
+LOCAL_SCRIPT="/opt/fedora-overhaul/script.sh"
+REMOTE_SCRIPT="https://raw.githubusercontent.com/z-Eduard005/fedora-overhaul/main/script.sh"
+
+if SCRIPT=$(curl -fsSL --connect-timeout 5 "$REMOTE_SCRIPT" 2>/dev/null); then
+  echo "$SCRIPT" > "$LOCAL_SCRIPT"
+fi
+
+/bin/bash -l "$LOCAL_SCRIPT"

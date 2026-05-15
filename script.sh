@@ -12,11 +12,12 @@ YTM_DOWNLOAD_URL="https://api.github.com/repos/pear-devs/pear-desktop/releases/l
 WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm"
 EXT_CLI="$HOME/.local/bin/gnome-extensions-cli"
 WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
+CURSORS_DIR="$HOME/.local/share/icons"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
 DNF_CONF="/etc/dnf/dnf.conf"
 ADWAITA_ICONS_DIR="/usr/share/icons/Adwaita"
 ADWAITA_ACTIONS_ICONS_DIR="$ADWAITA_ICONS_DIR/scalable/actions"
-PROJECT_DIR="$HOME/Programs/fedora-post-install"
+PROJECT_DIR="/opt/fedora-overhaul"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 DTP_CONF_PATH="/org/gnome/shell/extensions/dash-to-panel/"
 COMPLETE_SOUND_FILE="/usr/share/sounds/freedesktop/stereo/complete.oga"
@@ -38,7 +39,6 @@ DNF_PKGS=(
   "python3-pip"
   "zsh"
   "gnome-tweaks"
-  "curl"
   "cabextract"
   "xorg-x11-font-utils"
   "fontconfig"
@@ -102,7 +102,7 @@ set_scx_loader_option() {
   fi
 }
 
-is_gpu() { lspci | grep -Ei 'vga|3d|display' | grep -qi "$1"; }
+is_gpu() { lspci -d ::03xx | grep -qi "$1"; }
 
 log_step() {
   echo "$(info "$step")"
@@ -137,12 +137,17 @@ while true; do
   kill -0 "$$" || exit
 done 2>/dev/null &
 
+echo "###########################"
+echo "## Fedora Overhaul 0.1.0 ##"
+echo "###########################"
+echo ""
+
 step="[0|13]: Downloading the program data"
 run_the_step && {
-  rm -rf "$PROJECT_DIR"
-  git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR" || throw_err "Error while downloading the program data"
-  rm -rf "$PROJECT_DIR/.git/"
-  sudo mkdir -p "$KERNEL_POSTINST_DIR" "$WALLPAPERS_DIR" "$ADWAITA_ACTIONS_ICONS_DIR" "$LIBREOFFICE_USER_DIR"
+  sudo rm -rf "$PROJECT_DIR"
+  sudo mkdir -p "$PROJECT_DIR" "$KERNEL_POSTINST_DIR" "$WALLPAPERS_DIR" "$ADWAITA_ACTIONS_ICONS_DIR" "$LIBREOFFICE_USER_DIR"
+  sudo git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR" || throw_err "Error while downloading the program data"
+  sudo rm -rf "$PROJECT_DIR/.gitignore" "$PROJECT_DIR/.git/" "$PROJECT_DIR/docs/" "$PROJECT_DIR/rpmbuild/" "$PROJECT_DIR/build.sh"
 } && save_step
 
 step="[1|13]: Configuring system package manager"; log_step
@@ -324,7 +329,6 @@ run_the_step && {
   gsettings set org.gnome.nautilus.list-view default-zoom-level 'medium'
   gsettings set org.gnome.nautilus.preferences default-folder-viewer 'list-view'
   gsettings set org.gtk.gtk4.Settings.FileChooser sort-directories-first true
-  gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 
   cp "$PROJECT_DIR/data/registrymodifications.xcu" "$LIBREOFFICE_USER_DIR/registrymodifications.xcu"
   for f in "${TEMPLATE_FILENAMES[@]}"; do
@@ -345,6 +349,8 @@ step="[12|13]: Setting up look of your desktop"; log_step
 for f in "${WALLPAPER_FILENAMES[@]}"; do
   cp "$PROJECT_DIR/data/$f" "$WALLPAPERS_DIR/$f"
 done
+cp -r "$PROJECT_DIR/data/macOS/" "$CURSORS_DIR"
+gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 
 SELECTED_LOOK=$(zenity --list --radiolist \
   --title="Desktop Look" \

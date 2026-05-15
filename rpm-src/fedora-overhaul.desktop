@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Fedora Overhaul
+Comment=Set up your Fedora Linux easy way
+Exec=pkexec fedora-overhaul
+Icon=/usr/share/icons/fedora-overhaul.png
+Terminal=true
+Type=Application
+Categories=System;Settings;
