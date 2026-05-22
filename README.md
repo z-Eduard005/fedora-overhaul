@@ -1,3 +1,3 @@
-# My all-in-one instructions on how to install Fedora Linux the easy way.
+# My Fedora Linux post-install program
 
 `https://z-eduard005.github.io/fedora-overhaul/`

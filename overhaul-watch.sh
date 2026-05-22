@@ -4,8 +4,6 @@ apply_accent() {
   ACCENT=$(gsettings get org.gnome.desktop.interface accent-color | tr -d "'")
   gsettings set org.gnome.desktop.interface icon-theme "Adwaita-$ACCENT"
 
-  # unlink "$HOME/.config/gtk-4.0/gtk.css" 2>/dev/null
-  # unlink "$HOME/.config/gtk-4.0/assets" 2>/dev/null
   unlink "$HOME/.config/gtk-3.0/gtk.css" 2>/dev/null
   unlink "$HOME/.config/gtk-3.0/assets" 2>/dev/null
 
@@ -15,7 +13,6 @@ apply_accent() {
     fi
   done
 
-  # echo ":root { --accent-bg-color: var(--accent-$ACCENT); }" > "$HOME/.config/gtk-4.0/gtk.css"
   cat <<EOF > "$HOME/.config/gtk-3.0/gtk.css"
 @define-color accent_blue #3584e4;
 @define-color accent_teal #2190a4;
