@@ -12,8 +12,7 @@ YTM_DOWNLOAD_URL="https://api.github.com/repos/pear-devs/pear-desktop/releases/l
 WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm"
 ADW_COLORS_REPO="https://github.com/dpejoh/Adwaita-colors"
 TMP_ADW_COLORS_DIR="/tmp/Adwaita-colors"
-LOCAL_BIN_DIR="$HOME/.local/bin"
-EXT_CLI="$LOCAL_BIN_DIR/gnome-extensions-cli"
+EXT_CLI="$HOME/.local/bin/gnome-extensions-cli"
 WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 CURSORS_DIR="$HOME/.local/share/icons"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
@@ -24,6 +23,7 @@ PROJECT_DIR="/opt/fedora-overhaul"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 SERVICE_DIR="$HOME/.config/systemd/user"
 DTP_CONF_PATH="/org/gnome/shell/extensions/dash-to-panel/"
+ARC_MENU_CONF_PATH="/org/gnome/shell/extensions/arcmenu/"
 COMPLETE_SOUND_FILE="/usr/share/sounds/freedesktop/stereo/complete.oga"
 STEAMAPPS_DIR="$HOME/.steam/steam/steamapps"
 BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"
@@ -309,7 +309,12 @@ run_the_step && {
 
 step="[6|14]: Removing unnecessary programs"
 run_the_step && {
-  sudo dnf remove -y "${REMOVE_PKGS[@]}" || throw_err "Error while removing unnecessary programs"
+  (
+    set -e
+    sudo dnf remove -y "${REMOVE_PKGS[@]}"
+    cp /usr/share/applications/yad-icon-browser.desktop ~/.local/share/applications/
+    echo "Hidden=true" >> ~/.local/share/applications/yad-icon-browser.desktop
+  ) || throw_err "Error while removing unnecessary programs"
 } && save_step
 
 step="[7|14]: Make the grub start faster"
@@ -400,8 +405,8 @@ EOF
 
 step="[12|14]: Installing essential gnome extensions"
 run_the_step && {
-  $EXT_CLI install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com || throw_err "Error while installing gnome extensions"
-  ext_cli_disable Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com background-logo@fedorahosted.org || echo "$(warn "Some extensions are not disabled, so you might see some visual issues, disable them, if you need, in Extensions Manager app")"
+  $EXT_CLI install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com || throw_err "Error while installing gnome extensions"
+  ext_cli_disable Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com background-logo@fedorahosted.org || echo "$(warn "Some extensions are not disabled, so you might see some visual issues, disable them, if you need, in Extensions Manager app")"
 } && save_step
 
 step="Copying wallpapers and cursor files"
@@ -453,18 +458,21 @@ PROGRAMS=$(yad --list --checklist \
 selected() { echo "$PROGRAMS" | grep -qw "$1"; }
 
 case "$SELECTED_LOOK" in
-  "windows")
+  "TRUE|windows|")
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[0]}"
     (
       set -e
-      $EXT_CLI install gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
-      step="Pre-configure dash-to-panel.conf"
-      ! is_step_done && dconf load "$DTP_CONF_PATH" < "$PROJECT_DIR/data/dash-to-panel.conf" && save_step
-      $EXT_CLI enable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
+      $EXT_CLI install gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
+      step="Pre-configure win extensions"
+      ! is_step_done && {
+        dconf load "$DTP_CONF_PATH" < "$PROJECT_DIR/data/dash-to-panel.conf"
+        dconf load "$ARC_MENU_CONF_PATH" < "$PROJECT_DIR/data/arcmenu.conf"
+      } && save_step
+      $EXT_CLI enable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
       ext_cli_disable dash-to-dock@micxgx.gmail.com hidetopbar@mathieu.bidon.ca
     ) || echo "$(warn "Failed to set 'windows' style. Try again")"
     ;;
-  "macos")
+  "TRUE|macos|")
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[1]}"
     (
       set -e
@@ -473,24 +481,20 @@ case "$SELECTED_LOOK" in
       ext_cli_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
     ) || echo "$(warn "Failed to set 'macos' style. Try again")"
     ;;
-  "linux")
+  "TRUE|linux|")
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[2]}"
     (
       set -e
-      ext_cli_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com
+      ext_cli_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com arcmenu@arcmenu.com
     ) || echo "$(warn "Failed to set 'linux' style. Try again")"
     ;;
 esac
 
-[ -z "$SELECTED_LOOK" ] || {
+[ -n "$SELECTED_LOOK" ] && {
   WALLPAPER="file://$WALLPAPERS_DIR/$WALLPAPER_NAME"
   gsettings set org.gnome.desktop.background picture-uri "$WALLPAPER"
   gsettings set org.gnome.desktop.background picture-uri-dark "$WALLPAPER"
 }
-
-sudo cp "$PROJECT_DIR/data/view-app-grid-symbolic.svg" "$ADWAITA_ACTIONS_ICONS_DIR/view-app-grid-symbolic.svg"
-sudo gtk-update-icon-cache "$ADWAITA_ICONS_DIR"
-$EXT_CLI update >/dev/null 2>&1
 
 step="[14|14]: Installing selected programs"; log_step
 (
@@ -508,6 +512,7 @@ step="[14|14]: Installing selected programs"; log_step
   if selected "hidetopbar"; then
     $EXT_CLI install hidetopbar@mathieu.bidon.ca
     $EXT_CLI update hidetopbar@mathieu.bidon.ca
+    ext_cli_disable hidetopbar@mathieu.bidon.ca
   fi
   if selected "vitals"; then
     $EXT_CLI install Vitals@CoreCoding.com
@@ -517,26 +522,20 @@ step="[14|14]: Installing selected programs"; log_step
 ) || echo "$(warn "Some extensions failed to enable. Try again")"
 
 if selected "youtube-music"; then
-  proceed_ytm_install=true
-
-  is_ytm_exists=0
-  rpm -qa | grep -q youtube-music && is_ytm_exists=1
-
-  [ "$is_ytm_exists" -eq 1 ] && {
-    echo "$(warn "YouTube Music App is already installed")"
-    ask_confirm "Do you want to reinstall?" || proceed_ytm_install=false
-  }
-
-    if [[ "$proceed_ytm_install" == true ]]; then
-    ytm_release_url=$(echo "$YTM_DOWNLOAD_URL" | sed 's/api\.//; s/repos\///')
-    echo "Installing YouTube Music App from \"$ytm_release_url\"..."
-    (
-      set -e
-      [ "$is_ytm_exists" -eq 1 ] && sudo dnf remove -y youtube-music
+  (
+    set -e
+    action="installing"
+    if rpm -qa | grep -q youtube-music; then
+      action="deleting"
+      echo "$(warn "YouTube Music App is already installed")"
+      ask_confirm "Do you want to delete it?" && sudo dnf remove -y youtube-music
+    else
+      ytm_release_url=$(echo "$YTM_DOWNLOAD_URL" | sed 's/api\.//; s/repos\///')
+      echo "Installing YouTube Music App from \"$ytm_release_url\"..."
       curl -s "$YTM_DOWNLOAD_URL" | grep browser_download_url | grep x86_64.rpm | cut -d '"' -f 4 | xargs curl -L -o "$HOME/Downloads/youtube-music.rpm"
       sudo dnf install -y "$HOME/Downloads/youtube-music.rpm"
-    ) || echo "$(warn "Error while installing Youtube Music App. Try again")"
-  fi
+    fi
+  ) || echo "$(warn "Error while $action Youtube Music App. Try again")"
 fi
 
 if selected "vicinae"; then
@@ -552,8 +551,8 @@ if selected "minecraft"; then
 fi
 
 yad --info \
-  --title="Setup Complete!" \
-  --text="🎉 Your Fedora installation is ready to use! Have fun :)\n\nYou can install any app in the default Software App or from browser using .rpm (x86_64), .AppImage or .snap file formats.\n\nWhat was done:\n• Package manager optimized\n• System updated\n• RPM Fusion enabled\n• Essential codecs installed\n• Boot time reduced\n• Terminal utilities installed (zsh, oh-my-zsh)\n• Default music app changed\n• Essential programs installed\n• Unnecessary programs removed\n• System settings tweaked\n• GNOME extensions installed\n• Desktop look configured\n• Selected programs installed\n\n⚠️ Your system needs to reboot for all changes to take effect." \
+  --title="Setup Complete" \
+  --text="Your Fedora installation is ready to use" \
   --width=400
 
 yad --question \
