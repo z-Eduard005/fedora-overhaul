@@ -4,9 +4,9 @@ export LANG=C
 export LC_ALL=C
 
 GITHUB_REPO="https://github.com/z-Eduard005/fedora-overhaul.git"
-MC_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/fedora-mc-installer/main/mc-installer.sh)"'
-OBS_HOTKEYS_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-obs-hotkeys/main/install.sh)"'
-VICINAE_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-vicinae-installer/main/install.sh)"'
+MC_INSTALLER='/bin/bash -lc "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/linux-mc-installer/main/installer.sh)"'
+OBS_HOTKEYS_INSTALLER='/bin/bash -lc "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-obs-hotkeys/main/install.sh)"'
+VICINAE_INSTALLER='/bin/bash -lc "$(curl -fsSL https://raw.githubusercontent.com/z-Eduard005/gnome-vicinae-installer/main/install.sh)"'
 OMZ_INSTALLER='sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
 YTM_DOWNLOAD_URL="https://api.github.com/repos/pear-devs/pear-desktop/releases/latest"
 WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm"
@@ -35,9 +35,9 @@ RPM_FUSION_PKGS=(
   "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
   "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 )
-REMOVE_PKGS=(gnome-tour baobab malcontent-control yelp)
-MEDIA_CODEC_PKGS=(x264 obs-studio-plugin-x264)
-ALLOWERASING_DNF_PKGS=(power-profiles-daemon)
+REMOVE_PKGS=("gnome-tour" "baobab" "malcontent-control" "yelp")
+MEDIA_CODEC_PKGS=("x264" "obs-studio-plugin-x264")
+ALLOWERASING_DNF_PKGS=("power-profiles-daemon")
 DNF_PKGS=(
   "fastfetch"
   "python3-pip"
@@ -54,12 +54,12 @@ FLATHUB_PKGS=(
   "com.usebottles.bottles|bottles"
 )
 FLATPAK_PKGS=("com.github.neithern.g4music|g4music")
-NVIDIA_DRIVER_PKGS=(akmod-nvidia xorg-x11-drv-nvidia-cuda kernel-devel kernel-headers gcc make dkms acpid libglvnd-glx libglvnd-opengl libglvnd-devel pkgconfig egl-wayland)
-INTEL_DRIVER_PKGS=(intel-media-driver)
-AMD_DRIVER_SWAP_PKG=(mesa-va-drivers mesa-va-drivers-freeworld)
+NVIDIA_DRIVER_PKGS=("akmod-nvidia" "xorg-x11-drv-nvidia-cuda" "kernel-devel" "kernel-headers" "gcc" "make" "dkms" "acpid" "libglvnd-glx" "libglvnd-opengl" "libglvnd-devel" "pkgconfig" "egl-wayland")
+INTEL_DRIVER_PKGS=("intel-media-driver")
+AMD_DRIVER_SWAP_PKG=("mesa-va-drivers" "mesa-va-drivers-freeworld")
 CACHY_COPRS=("bieszczaders/kernel-cachyos" "bieszczaders/kernel-cachyos-addons")
-CACHY_PKGS=(kernel-cachyos kernel-cachyos-devel-matched)
-ALLOWERASING_CACHY_PKGS=(cachyos-settings scx-scheds-git scx-tools-git)
+CACHY_PKGS=("kernel-cachyos" "kernel-cachyos-devel-matched")
+ALLOWERASING_CACHY_PKGS=("cachyos-settings" "scx-scheds-git" "scx-tools-git")
 TEMPLATE_FILENAMES=("Text_Document.txt" "Word_Document.docx" "Excel_Document.xlsx")
 
 success() { printf "\033[1;32m%s\033[0m" "$1"; }
@@ -366,13 +366,19 @@ run_the_step && {
     gsettings set org.gnome.nautilus.preferences default-folder-viewer 'list-view'
     gsettings set org.gtk.gtk4.Settings.FileChooser sort-directories-first true
     gsettings set org.gnome.desktop.interface gtk-enable-primary-paste false
+    gsettings set org.gnome.desktop.interface font-name 'Adwaita Sans 12'
 
     sudo cp "$PROJECT_DIR/data/registrymodifications.xcu" "$LIBREOFFICE_USER_DIR/registrymodifications.xcu"
     for f in "${TEMPLATE_FILENAMES[@]}"; do
       sudo cp "$PROJECT_DIR/data/$f" "$HOME/Templates/$f"
     done
-    sed -i "1s|^|file://$STEAMAPPS_DIR Steamapps\n|" "$BOOKMARKS_FILE"
-    sed -i "1s|^|file://$WALLPAPERS_DIR Wallpapers\n|" "$BOOKMARKS_FILE"
+
+    if ! grep -q "file://$STEAMAPPS_DIR Steamapps" "$BOOKMARKS_FILE" 2>/dev/null; then
+      sed -i "1s|^|file://$STEAMAPPS_DIR Steamapps\n|" "$BOOKMARKS_FILE"
+    fi
+    if ! grep -q "file://$WALLPAPERS_DIR Wallpapers" "$BOOKMARKS_FILE" 2>/dev/null; then
+      sed -i "1s|^|file://$WALLPAPERS_DIR Wallpapers\n|" "$BOOKMARKS_FILE"
+    fi
     nautilus -q >/dev/null 2>&1 || true
   ) || throw_err "System settings are not configured correctly"
 } && save_step
