@@ -12,7 +12,7 @@ YTM_DOWNLOAD_URL="https://api.github.com/repos/pear-devs/pear-desktop/releases/l
 WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm"
 ADW_COLORS_REPO="https://github.com/dpejoh/Adwaita-colors"
 TMP_ADW_COLORS_DIR="/tmp/Adwaita-colors"
-EXT_CLI="$HOME/.local/bin/gnome-extensions-cli"
+
 WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 CURSORS_DIR="$HOME/.local/share/icons"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
@@ -47,6 +47,7 @@ DNF_PKGS=(
   "xorg-x11-font-utils"
   "fontconfig"
   "adw-gtk3-theme"
+  "ydotool"
   "steam|com.valvesoftware.Steam"
 )
 FLATHUB_PKGS=(
@@ -119,8 +120,46 @@ run_the_step() {
   log_step
 }
 
-ext_cli_disable() {
-  $EXT_CLI disable "$@"; $EXT_CLI update "$@"
+ext_install() {
+  for uuid in "$@"; do
+    gdbus call --session \
+      --dest org.gnome.Shell.Extensions \
+      --object-path /org/gnome/Shell/Extensions \
+      --method org.gnome.Shell.Extensions.InstallRemoteExtension "$uuid" &
+    until gdbus call --session \
+      --dest org.gnome.Shell \
+      --object-path /org/gnome/Shell \
+      --method org.gnome.Shell.Eval 'Main.modalCount > 0' 2>/dev/null | grep -q "(true"; do
+      sleep 0.1
+    done
+    ydotool key 28:1 28:0
+    until gdbus call --session \
+      --dest org.gnome.Shell \
+      --object-path /org/gnome/Shell \
+      --method org.gnome.Shell.Eval 'Main.modalCount == 0' 2>/dev/null | grep -q "(true"; do
+      sleep 0.1
+    done
+    wait
+    ext_enable "$uuid"
+  done
+}
+
+ext_enable() {
+  for uuid in "$@"; do
+    gdbus call --session \
+      --dest org.gnome.Shell.Extensions \
+      --object-path /org/gnome/Shell/Extensions \
+      --method org.gnome.Shell.Extensions.EnableExtension "$uuid" >/dev/null 2>&1
+  done
+}
+
+ext_disable() {
+  for uuid in "$@"; do
+    gdbus call --session \
+      --dest org.gnome.Shell.Extensions \
+      --object-path /org/gnome/Shell/Extensions \
+      --method org.gnome.Shell.Extensions.DisableExtension "$uuid" >/dev/null 2>&1
+  done
 }
 
 [ "$EUID" -eq 0 ] && { echo "$(err 'Do not run this script with "sudo"!')" >&2; exit 1; }
@@ -295,7 +334,6 @@ run_the_step && {
     [[ ${#final_rpm[@]} -gt 0 ]] && sudo dnf install -y "${final_rpm[@]}"
     [[ ${#final_flathub[@]} -gt 0 ]] && sudo flatpak install -y flathub "${final_flathub[@]}"
     [[ ${#final_fedora[@]} -gt 0 ]] && sudo flatpak install -y fedora "${final_fedora[@]}"
-    pip3 install "$(basename $EXT_CLI)"
     [ -d "$HOME/.oh-my-zsh" ] || eval "$OMZ_INSTALLER"
     if ! rpm -q msttcore-fonts-installer >/dev/null 2>&1; then
       sudo rpm --nodigest -i "$WIN_FONTS_PKG"
@@ -411,8 +449,10 @@ EOF
 
 step="[12|14]: Installing essential gnome extensions"
 run_the_step && {
-  $EXT_CLI install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com || throw_err "Error while installing gnome extensions"
-  ext_cli_disable Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com background-logo@fedorahosted.org || echo "$(warn "Some extensions are not disabled, so you might see some visual issues, disable them, if you need, in Extensions Manager app")"
+  ydotoold &
+  sleep 1
+  ext_install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com || throw_err "Error while installing gnome extensions"
+  ext_disable Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com background-logo@fedorahosted.org || echo "$(warn "Some extensions are not disabled, so you might see some visual issues, disable them, if you need, in Extensions Manager app")"
 } && save_step
 
 step="Copying wallpapers and cursor files"
@@ -468,30 +508,30 @@ case "$SELECTED_LOOK" in
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[0]}"
     (
       set -e
-      $EXT_CLI install gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
+      ext_install gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
       step="Pre-configure win extensions"
       ! is_step_done && {
         dconf load "$DTP_CONF_PATH" < "$PROJECT_DIR/data/dash-to-panel.conf"
         dconf load "$ARC_MENU_CONF_PATH" < "$PROJECT_DIR/data/arcmenu.conf"
       } && save_step
-      $EXT_CLI enable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
-      ext_cli_disable dash-to-dock@micxgx.gmail.com hidetopbar@mathieu.bidon.ca
+      ext_enable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
+      ext_disable dash-to-dock@micxgx.gmail.com hidetopbar@mathieu.bidon.ca
     ) || echo "$(warn "Failed to set 'windows' style. Try again")"
     ;;
   "TRUE|macos|")
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[1]}"
     (
       set -e
-      $EXT_CLI install dash-to-dock@micxgx.gmail.com
-      $EXT_CLI enable dash-to-dock@micxgx.gmail.com
-      ext_cli_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
+      ext_install dash-to-dock@micxgx.gmail.com
+      ext_enable dash-to-dock@micxgx.gmail.com
+      ext_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
     ) || echo "$(warn "Failed to set 'macos' style. Try again")"
     ;;
   "TRUE|linux|")
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[2]}"
     (
       set -e
-      ext_cli_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com arcmenu@arcmenu.com
+      ext_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com arcmenu@arcmenu.com
     ) || echo "$(warn "Failed to set 'linux' style. Try again")"
     ;;
 esac
@@ -506,24 +546,17 @@ step="[14|14]: Installing selected programs"; log_step
 (
   set -e
   if selected "color-picker"; then
-    $EXT_CLI install color-picker@tuberry
-    $EXT_CLI update color-picker@tuberry
-    $EXT_CLI enable color-picker@tuberry
+    ext_install color-picker@tuberry
   fi
   if selected "rounded-corners"; then
-    $EXT_CLI install rounded-window-corners@fxgn
-    $EXT_CLI update rounded-window-corners@fxgn
-    $EXT_CLI enable rounded-window-corners@fxgn
+    ext_install rounded-window-corners@fxgn
   fi
   if selected "hidetopbar"; then
-    $EXT_CLI install hidetopbar@mathieu.bidon.ca
-    $EXT_CLI update hidetopbar@mathieu.bidon.ca
-    ext_cli_disable hidetopbar@mathieu.bidon.ca
+    ext_install hidetopbar@mathieu.bidon.ca
+    ext_disable hidetopbar@mathieu.bidon.ca
   fi
   if selected "vitals"; then
-    $EXT_CLI install Vitals@CoreCoding.com
-    $EXT_CLI update Vitals@CoreCoding.com
-    $EXT_CLI enable Vitals@CoreCoding.com
+    ext_install Vitals@CoreCoding.com
   fi
 ) || echo "$(warn "Some extensions failed to enable. Try again")"
 
