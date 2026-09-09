@@ -40,6 +40,7 @@ MEDIA_CODEC_PKGS=("x264" "obs-studio-plugin-x264")
 ALLOWERASING_DNF_PKGS=("power-profiles-daemon")
 DNF_PKGS=(
   "fastfetch"
+  "grubby"
   "python3-pip"
   "zsh"
   "gnome-tweaks"
@@ -120,27 +121,68 @@ run_the_step() {
   log_step
 }
 
+shell_alive() {
+  gdbus call --session \
+    --dest org.freedesktop.DBus \
+    --object-path /org/freedesktop/DBus \
+    --method org.freedesktop.DBus.NameHasOwner \
+    org.gnome.Shell 2>/dev/null | grep -q "(true"
+}
+
+ext_enabled() {
+  gsettings get org.gnome.shell enabled-extensions 2>/dev/null | grep -q "'$1'"
+}
+
 ext_install() {
   for uuid in "$@"; do
-    gdbus call --session \
-      --dest org.gnome.Shell.Extensions \
-      --object-path /org/gnome/Shell/Extensions \
-      --method org.gnome.Shell.Extensions.InstallRemoteExtension "$uuid" &
-    until gdbus call --session \
-      --dest org.gnome.Shell \
-      --object-path /org/gnome/Shell \
-      --method org.gnome.Shell.Eval 'Main.modalCount > 0' 2>/dev/null | grep -q "(true"; do
-      sleep 0.1
+    local ext_dir="$HOME/.local/share/gnome-shell/extensions/$uuid"
+    if [ -d "$ext_dir" ]; then
+      if ext_enabled "$uuid"; then
+        echo "$(info "Already installed and enabled: $uuid")"
+      else
+        echo "$(info "Already installed, enabling: $uuid")"
+        ext_enable "$uuid"
+      fi
+      continue
+    fi
+    echo "$(info "Installing $uuid")"
+    local round=0
+    while [ "$round" -lt 3 ] && ! [ -d "$ext_dir" ] && shell_alive; do
+      round=$((round + 1))
+      {
+        install_status=0
+        gdbus call --session \
+          --dest org.gnome.Shell.Extensions \
+          --object-path /org/gnome/Shell/Extensions \
+          --method org.gnome.Shell.Extensions.InstallRemoteExtension "$uuid" >/tmp/ext-install.log 2>&1 || install_status=$?
+        echo "$install_status" > /tmp/ext-install.status
+      } &
+      local install_pid=$!
+      local attempts=0
+      while [ "$attempts" -lt 300 ] && ! [ -d "$ext_dir" ]; do
+        if shell_alive; then
+          ydotool key 28:1 28:0
+          sleep 1
+          attempts=$((attempts + 1))
+          [ -f /tmp/ext-install.status ] && [ "$attempts" -gt 10 ] && break
+        else
+          break
+        fi
+      done
+      wait "$install_pid" 2>/dev/null
+      rm -f /tmp/ext-install.status
+      if ! shell_alive; then
+        echo "$(warn "$uuid crashed GNOME Shell on attempt $round")"
+      fi
     done
-    ydotool key 28:1 28:0
-    until gdbus call --session \
-      --dest org.gnome.Shell \
-      --object-path /org/gnome/Shell \
-      --method org.gnome.Shell.Eval 'Main.modalCount == 0' 2>/dev/null | grep -q "(true"; do
-      sleep 0.1
-    done
-    wait
-    ext_enable "$uuid"
+    if [ -d "$ext_dir" ]; then
+      ext_enable "$uuid"
+    elif shell_alive; then
+      echo "$(warn "Failed to install $uuid after 3 attempts, see /tmp/ext-install.log")"
+    else
+      echo "$(warn "$uuid crashed GNOME Shell, removing it from enabled list")"
+      gsettings set org.gnome.shell enabled-extensions "$(gsettings get org.gnome.shell enabled-extensions | sed "s/'$uuid'[ ,]*//; s/\[, */[/; s/, *\]/]/")"
+    fi
   done
 }
 
@@ -171,10 +213,7 @@ while true; do
   kill -0 "$$" || exit
 done 2>/dev/null &
 
-echo "###########################"
-echo "## Fedora Overhaul 0.2.0 ##"
-echo "###########################"
-echo ""
+echo -ne "\033]0;Fedora Overhaul 0.2.0\007"
 
 step="[0|14]: Downloading the program data"
 run_the_step && {
@@ -259,9 +298,10 @@ EOF
 
     sudo dnf install -y "${ALLOWERASING_CACHY_PKGS[@]}" --allowerasing
     sudo dracut -f
+    sudo setsebool -P domain_kernel_load_modules on
 
-    sudo scxctl start --sched lavd --mode gaming || sudo scxctl switch --sched lavd --mode gaming
-    echo -e 'default_sched = "scx_lavd"\ndefault_mode = "Gaming"' | sudo tee "$SCX_LOADER_CONF" > /dev/null
+    # sudo scxctl start --sched lavd --mode gaming || sudo scxctl switch --sched lavd --mode gaming
+    # echo -e 'default_sched = "scx_lavd"\ndefault_mode = "Gaming"' | sudo tee "$SCX_LOADER_CONF" > /dev/null
   ) || throw_err "Error while installing cachyos kernel"
 } && save_step
 
@@ -451,8 +491,7 @@ step="[12|14]: Installing essential gnome extensions"
 run_the_step && {
   ydotoold &
   sleep 1
-  ext_install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com || throw_err "Error while installing gnome extensions"
-  ext_disable Vitals@CoreCoding.com hidetopbar@mathieu.bidon.ca rounded-window-corners@fxgn color-picker@tuberry dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com gtk4-ding@smedius.gitlab.com arcmenu@arcmenu.com background-logo@fedorahosted.org || echo "$(warn "Some extensions are not disabled, so you might see some visual issues, disable them, if you need, in Extensions Manager app")"
+  ext_install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection || throw_err "Error while installing gnome extensions"
 } && save_step
 
 step="Copying wallpapers and cursor files"
@@ -495,7 +534,7 @@ PROGRAMS=$(yad --list --checklist \
   FALSE "hidetopbar"      "Hide Top Bar (GNOME Extension)" \
   FALSE "vitals"          "Vitals - system monitor" \
   FALSE "youtube-music"   "YouTube Music App" \
-  FALSE "vicinae"         "Vicinae - launcher &amp; clipboard manager" \
+  FALSE "vicinae"         "Vicinae - app launcher &amp; clipboard manager" \
   FALSE "obs-hotkeys"     "Fix OBS recording hotkeys (you want this if you will record with OBS)" \
   FALSE "minecraft"       "Minecraft (FREE VERSION)" \
   --width=800 \
@@ -508,13 +547,12 @@ case "$SELECTED_LOOK" in
     WALLPAPER_NAME="${WALLPAPER_FILENAMES[0]}"
     (
       set -e
-      ext_install gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
+      ext_install arcmenu@arcmenu.com gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
       step="Pre-configure win extensions"
       ! is_step_done && {
         dconf load "$DTP_CONF_PATH" < "$PROJECT_DIR/data/dash-to-panel.conf"
         dconf load "$ARC_MENU_CONF_PATH" < "$PROJECT_DIR/data/arcmenu.conf"
       } && save_step
-      ext_enable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com arcmenu@arcmenu.com
       ext_disable dash-to-dock@micxgx.gmail.com hidetopbar@mathieu.bidon.ca
     ) || echo "$(warn "Failed to set 'windows' style. Try again")"
     ;;
@@ -523,7 +561,6 @@ case "$SELECTED_LOOK" in
     (
       set -e
       ext_install dash-to-dock@micxgx.gmail.com
-      ext_enable dash-to-dock@micxgx.gmail.com
       ext_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
     ) || echo "$(warn "Failed to set 'macos' style. Try again")"
     ;;
