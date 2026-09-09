@@ -28,8 +28,6 @@ COMPLETE_SOUND_FILE="/usr/share/sounds/freedesktop/stereo/complete.oga"
 STEAMAPPS_DIR="$HOME/.steam/steam/steamapps"
 BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"
 SCX_LOADER_CONF="/etc/scx_loader.toml"
-KERNEL_POSTINST_DIR="/etc/kernel/postinst.d"
-NEWEST_CACHY_KERNEL="\$(ls /boot | grep 'vmlinuz.*cachy' | sort -V | tail -1)"
 STATE_FILE="$PROJECT_DIR/state"
 RPM_FUSION_PKGS=(
   "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
@@ -40,7 +38,6 @@ MEDIA_CODEC_PKGS=("x264" "obs-studio-plugin-x264")
 ALLOWERASING_DNF_PKGS=("power-profiles-daemon")
 DNF_PKGS=(
   "fastfetch"
-  "grubby"
   "python3-pip"
   "zsh"
   "gnome-tweaks"
@@ -60,7 +57,8 @@ NVIDIA_DRIVER_PKGS=("akmod-nvidia" "xorg-x11-drv-nvidia-cuda" "kernel-devel" "ke
 INTEL_DRIVER_PKGS=("intel-media-driver")
 AMD_DRIVER_SWAP_PKG=("mesa-va-drivers" "mesa-va-drivers-freeworld")
 CACHY_COPRS=("bieszczaders/kernel-cachyos" "bieszczaders/kernel-cachyos-addons")
-CACHY_PKGS=("kernel-cachyos" "kernel-cachyos-devel-matched")
+CACHY_TOOL_PKGS=("grubby" "libdnf5-plugin-actions")
+CACHY_KERNEL_PKGS=("kernel-cachyos" "kernel-cachyos-devel-matched")
 ALLOWERASING_CACHY_PKGS=("cachyos-settings" "scx-scheds-git" "scx-tools-git")
 TEMPLATE_FILENAMES=("Text_Document.txt" "Word_Document.docx" "Excel_Document.xlsx")
 
@@ -224,7 +222,7 @@ run_the_step && {
     fi
 
     sudo rm -rf "$PROJECT_DIR"
-    sudo mkdir -p "$PROJECT_DIR" "$KERNEL_POSTINST_DIR" "$ADWAITA_ACTIONS_ICONS_DIR"
+    sudo mkdir -p "$PROJECT_DIR" "$ADWAITA_ACTIONS_ICONS_DIR"
     mkdir -p "$WALLPAPERS_DIR" "$LIBREOFFICE_USER_DIR" "$SERVICE_DIR"
     sudo git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR"
     sudo rm -rf "$PROJECT_DIR/.gitignore" "$PROJECT_DIR/.git/" "$PROJECT_DIR/docs/" "$PROJECT_DIR/rpmbuild/" "$PROJECT_DIR/build.sh"
@@ -285,16 +283,15 @@ run_the_step && {
     for copr in "${CACHY_COPRS[@]}"; do
       sudo dnf copr enable -y "$copr"
     done
-    sudo dnf install -y "${CACHY_PKGS[@]}"
+    sudo dnf install -y "${CACHY_TOOL_PKGS[@]}"
 
-    sudo grubby --set-default="/boot/$(eval "$NEWEST_CACHY_KERNEL")"
-    sudo tee "$KERNEL_POSTINST_DIR/99-default" > /dev/null << EOF
-#!/bin/sh
-set -e
-grubby --set-default="/boot/${NEWEST_CACHY_KERNEL}"
+    sudo mkdir -p /etc/dnf/libdnf5-plugins/actions.d
+    sudo tee /etc/dnf/libdnf5-plugins/actions.d/cachy-default.actions > /dev/null << 'EOF'
+# After installing any kernel* package, set the latest CachyOS kernel as the default boot entry
+post_transaction:kernel*:in::/usr/bin/sh -c /usr/bin/grubby\ --set-default=/boot/$(ls\ /boot\ |\ grep\ vmlinuz.*cachy\ |\ sort\ -V\ |\ tail\ -1)
 EOF
-    sudo chown root:root "$KERNEL_POSTINST_DIR/99-default"
-    sudo chmod u+rx "$KERNEL_POSTINST_DIR/99-default"
+
+    sudo dnf install -y "${CACHY_KERNEL_PKGS[@]}"
 
     sudo dnf install -y "${ALLOWERASING_CACHY_PKGS[@]}" --allowerasing
     sudo dracut -f
