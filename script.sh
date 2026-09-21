@@ -17,8 +17,6 @@ WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 CURSORS_DIR="$HOME/.local/share/icons"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
 DNF_CONF="/etc/dnf/dnf.conf"
-ADWAITA_ICONS_DIR="/usr/share/icons/Adwaita"
-ADWAITA_ACTIONS_ICONS_DIR="$ADWAITA_ICONS_DIR/scalable/actions"
 PROJECT_DIR="/opt/fedora-overhaul"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 SERVICE_DIR="$HOME/.config/systemd/user"
@@ -69,11 +67,6 @@ info() { printf "\033[1;34m%s\033[0m" "$1"; }
 
 throw_err() {
   echo -e "$(err "$1\nTry one more time...")"
-  pw-play "$COMPLETE_SOUND_FILE"
-  yad --error \
-    --title="Error happened" \
-    --button="OK:0" \
-    --text="<span font='14'>$1</span>"
   exit 1
 }
 
@@ -195,10 +188,12 @@ ext_enable() {
 
 ext_disable() {
   for uuid in "$@"; do
-    gdbus call --session \
-      --dest org.gnome.Shell.Extensions \
-      --object-path /org/gnome/Shell/Extensions \
-      --method org.gnome.Shell.Extensions.DisableExtension "$uuid" >/dev/null 2>&1
+    if ext_enabled "$uuid"; then
+      gdbus call --session \
+        --dest org.gnome.Shell.Extensions \
+        --object-path /org/gnome/Shell/Extensions \
+        --method org.gnome.Shell.Extensions.DisableExtension "$uuid" >/dev/null 2>&1
+    fi
   done
 }
 
@@ -211,7 +206,7 @@ while true; do
   kill -0 "$$" || exit
 done 2>/dev/null &
 
-echo -ne "\033]0;Fedora Overhaul 0.2.0\007"
+echo -ne "\033]0;Fedora Overhaul 0.4.0\007"
 
 step="[0|14]: Downloading the program data"
 run_the_step && {
@@ -222,7 +217,7 @@ run_the_step && {
     fi
 
     sudo rm -rf "$PROJECT_DIR"
-    sudo mkdir -p "$PROJECT_DIR" "$ADWAITA_ACTIONS_ICONS_DIR"
+    sudo mkdir -p "$PROJECT_DIR"
     mkdir -p "$WALLPAPERS_DIR" "$LIBREOFFICE_USER_DIR" "$SERVICE_DIR"
     sudo git clone --depth=1 "$GITHUB_REPO" "$PROJECT_DIR"
     sudo rm -rf "$PROJECT_DIR/.gitignore" "$PROJECT_DIR/.git/" "$PROJECT_DIR/docs/" "$PROJECT_DIR/rpmbuild/" "$PROJECT_DIR/build.sh"
@@ -277,7 +272,7 @@ run_the_step && {
 } && save_step
 
 step="[4|14]: Installing cachyos kernel (for better performance)"
-run_the_step && {
+false && run_the_step && { # Not stable for now, so disabled!
   (
     set -e
     for copr in "${CACHY_COPRS[@]}"; do
@@ -292,13 +287,32 @@ post_transaction:kernel*:in::/usr/bin/sh -c /usr/bin/grubby\ --set-default=/boot
 EOF
 
     sudo dnf install -y "${CACHY_KERNEL_PKGS[@]}"
-
     sudo dnf install -y "${ALLOWERASING_CACHY_PKGS[@]}" --allowerasing
     sudo dracut -f
     sudo setsebool -P domain_kernel_load_modules on
 
-    # sudo scxctl start --sched lavd --mode gaming || sudo scxctl switch --sched lavd --mode gaming
-    # echo -e 'default_sched = "scx_lavd"\ndefault_mode = "Gaming"' | sudo tee "$SCX_LOADER_CONF" > /dev/null
+    sudo scxctl start --sched lavd --mode gaming || sudo scxctl switch --sched lavd --mode gaming
+    echo -e 'default_sched = "scx_lavd"\ndefault_mode = "Gaming"' | sudo tee "$SCX_LOADER_CONF" > /dev/null
+
+    sudo grubby --update-kernel=ALL --args="amdgpu.sg_display=0"
+
+    if lspci | grep -q "RTL8852BE"; then
+      sudo tee /usr/lib/systemd/system-sleep/unload-realtek.sh > /dev/null << 'EOF'
+#!/bin/sh
+case "$1" in
+    pre)
+        scxctl stop
+        /usr/sbin/modprobe -r rtw89_8852be btusb
+        ;;
+    post)
+        /usr/sbin/modprobe rtw89_8852be btusb
+        scxctl start --sched lavd --mode gaming || scxctl switch --sched lavd --mode gaming
+        ;;
+esac
+EOF
+
+      sudo chmod +x /usr/lib/systemd/system-sleep/unload-realtek.sh
+    fi
   ) || throw_err "Error while installing cachyos kernel"
 } && save_step
 
@@ -455,6 +469,7 @@ run_the_step && {
       sed -i "1s|^|file://$WALLPAPERS_DIR Wallpapers\n|" "$BOOKMARKS_FILE"
     fi
     nautilus -q >/dev/null 2>&1 || true
+    rfkill unblock bluetooth >/dev/null 2>&1 || true
   ) || throw_err "System settings are not configured correctly"
 } && save_step
 
@@ -508,16 +523,17 @@ step="Initialising steam"
   steam -silent > /dev/null 2>&1 & disown
 } && save_step
 
-step="[13|14]: Setting up look of your desktop"; log_step
-SELECTED_LOOK=$(yad --list --radiolist \
-  --title="Desktop Look" \
-  --text="Choose the look of your desktop:" \
-  --column="" --column="Look" \
-  FALSE "macos" \
-  FALSE "windows" \
-  TRUE "linux" \
-  --width=400 \
-  --height=400)
+# NOT SURE IF THATS NEEDED AT ALL FOR THIS SCRIPT - very biased
+# step="[13|14]: Setting up look of your desktop"; log_step
+# SELECTED_LOOK=$(yad --list --radiolist \
+#   --title="Desktop Look" \
+#   --text="Choose the look of your desktop:" \
+#   --column="" --column="Look" \
+#   FALSE "macos" \
+#   FALSE "windows" \
+#   TRUE "linux" \
+#   --width=400 \
+#   --height=400)
 
 PROGRAMS=$(yad --list --checklist \
   --title="Programs to install" \
@@ -558,7 +574,7 @@ case "$SELECTED_LOOK" in
     (
       set -e
       ext_install dash-to-dock@micxgx.gmail.com
-      ext_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
+      ext_disable arcmenu@arcmenu.com gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
     ) || echo "$(warn "Failed to set 'macos' style. Try again")"
     ;;
   "TRUE|linux|")
@@ -571,7 +587,7 @@ case "$SELECTED_LOOK" in
 esac
 
 [ -n "$SELECTED_LOOK" ] && {
-  WALLPAPER="file://$WALLPAPERS_DIR/$WALLPAPER_NAME"
+  WALLPAPER="file://$WALLPAPERS_DIR/${WALLPAPER_NAME:-${WALLPAPER_FILENAMES[2]}}"
   gsettings set org.gnome.desktop.background picture-uri "$WALLPAPER"
   gsettings set org.gnome.desktop.background picture-uri-dark "$WALLPAPER"
 }
@@ -623,14 +639,12 @@ if selected "minecraft"; then
   eval "$MC_INSTALLER" || echo "$(warn "Minecraft installation failed. Try later by running this program again")"
 fi
 
-yad --info \
-  --title="Setup Complete" \
-  --text="Your Fedora installation is ready to use" \
-  --width=400
-
-yad --question \
-  --title="Reboot" \
-  --text="Do you want to reboot now?" \
-  --button="Reboot now:0" \
-  --button="Later:1" \
-  --width=400 && systemctl reboot
+step="[15|15]: Prompt for reboot"
+run_the_step && {
+  yad --info \
+    --title="Setup Complete" \
+    --text="Your Fedora installation is ready to use\n\nDo you want to reboot now?" \
+    --width=400 \
+    --button="Reboot now:0" \
+    --button="Later:1" && systemctl reboot
+} && save_step
