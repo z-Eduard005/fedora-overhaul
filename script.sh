@@ -12,7 +12,6 @@ YTM_DOWNLOAD_URL="https://api.github.com/repos/pear-devs/pear-desktop/releases/l
 WIN_FONTS_PKG="https://downloads.sourceforge.net/project/mscorefonts2/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm"
 ADW_COLORS_REPO="https://github.com/dpejoh/Adwaita-colors"
 TMP_ADW_COLORS_DIR="/tmp/Adwaita-colors"
-
 WALLPAPERS_DIR="$HOME/.local/share/backgrounds"
 CURSORS_DIR="$HOME/.local/share/icons"
 WALLPAPER_FILENAMES=(windows.jpg macos.png linux.jpg)
@@ -20,9 +19,6 @@ DNF_CONF="/etc/dnf/dnf.conf"
 PROJECT_DIR="/opt/fedora-overhaul"
 LIBREOFFICE_USER_DIR="$HOME/.config/libreoffice/4/user"
 SERVICE_DIR="$HOME/.config/systemd/user"
-DTP_CONF_PATH="/org/gnome/shell/extensions/dash-to-panel/"
-ARC_MENU_CONF_PATH="/org/gnome/shell/extensions/arcmenu/"
-COMPLETE_SOUND_FILE="/usr/share/sounds/freedesktop/stereo/complete.oga"
 STEAMAPPS_DIR="$HOME/.steam/steam/steamapps"
 BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"
 SCX_LOADER_CONF="/etc/scx_loader.toml"
@@ -31,10 +27,11 @@ RPM_FUSION_PKGS=(
   "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
   "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
 )
-REMOVE_PKGS=("gnome-tour" "baobab" "malcontent-control" "yelp")
+REMOVE_PKGS=("decibels" "showtime" "gnome-tour" "baobab" "malcontent-control" "yelp")
 MEDIA_CODEC_PKGS=("x264" "obs-studio-plugin-x264")
 ALLOWERASING_DNF_PKGS=("power-profiles-daemon")
 DNF_PKGS=(
+  "vlc"
   "fastfetch"
   "python3-pip"
   "zsh"
@@ -66,7 +63,11 @@ warn() { printf "\033[1;33m%s\033[0m" "$1"; }
 info() { printf "\033[1;34m%s\033[0m" "$1"; }
 
 throw_err() {
-  echo -e "$(err "$1\nTry one more time...")"
+  echo "$(err "Error: $1")"
+  yad --error \
+  --title="Error happened" \
+  --button="OK:0" \
+  --text="<span font='14'>$1</span>"
   exit 1
 }
 
@@ -206,9 +207,9 @@ while true; do
   kill -0 "$$" || exit
 done 2>/dev/null &
 
-echo -ne "\033]0;Fedora Overhaul 0.4.0\007"
+echo -ne "\033]0;Fedora Overhaul 0.5.0\007"
 
-step="[0|14]: Downloading the program data"
+step="[1|15]: Downloading the program data"
 run_the_step && {
   (
     set -e
@@ -225,7 +226,7 @@ run_the_step && {
   ) || throw_err "Error while downloading the program data"
 } && save_step
 
-step="[1|14]: Configuring system package manager"
+step="[2|15]: Configuring system package manager"
 run_the_step && {
   (
     set -e
@@ -235,7 +236,7 @@ run_the_step && {
   ) || throw_err "Failed to configure system package manager"
 } && save_step
 
-step="[2|14]: Updating the system"
+step="[3|15]: Updating the system"
 run_the_step && {
   (
     set -e
@@ -250,7 +251,7 @@ run_the_step && {
   ) || throw_err "Failed to update the system"
 } && save_step
 
-step="[3|14]: Installing essential drivers and codecs"
+step="[4|15]: Installing essential drivers and codecs"
 run_the_step && {
   (
     set -e
@@ -271,7 +272,7 @@ run_the_step && {
   ) || throw_err "Error while installing essential drivers and codecs"
 } && save_step
 
-step="[4|14]: Installing cachyos kernel (for better performance)"
+step="[5|15]: Installing cachyos kernel (for better performance)"
 false && run_the_step && { # Not stable for now, so disabled!
   (
     set -e
@@ -316,7 +317,7 @@ EOF
   ) || throw_err "Error while installing cachyos kernel"
 } && save_step
 
-step="[5|14]: Installing essential programs"
+step="[6|15]: Installing essential programs"
 run_the_step && {
   declare -A installed=(
     [rpm]="$(rpm -qa --qf '%{NAME}\n' 2>/dev/null)"
@@ -396,7 +397,7 @@ run_the_step && {
   ) || throw_err "Error while installing essential programs"
 } && save_step
 
-step="[6|14]: Removing unnecessary programs"
+step="[7|15]: Removing unnecessary programs"
 run_the_step && {
   (
     set -e
@@ -406,7 +407,7 @@ run_the_step && {
   ) || throw_err "Error while removing unnecessary programs"
 } && save_step
 
-step="[7|14]: Make the grub start faster"
+step="[8|15]: Make the grub start faster"
 run_the_step && {
   (
     set -e
@@ -415,7 +416,7 @@ run_the_step && {
   ) || throw_err "Error while generating grub config"
 } && save_step
 
-step="[8|14]: Tweaking terminal"
+step="[9|15]: Tweaking terminal"
 run_the_step && {
   (
     set -e
@@ -429,12 +430,12 @@ run_the_step && {
   ) || throw_err "Error setting up terminal"
 } && save_step
 
-step="[9|14]: Changing default music app"
+step="[10|15]: Changing default music app"
 run_the_step && {
   flatpak list --app | grep -q "com.github.neithern.g4music" && xdg-mime default com.github.neithern.g4music.desktop audio/mpeg audio/flac audio/x-wav audio/ogg || echo "$(warn "Failed to set default music app")"
 } && save_step
 
-step="[10|14]: Tweaking system settings"
+step="[11|15]: Tweaking system settings"
 run_the_step && {
   (
     set -e
@@ -473,7 +474,7 @@ run_the_step && {
   ) || throw_err "System settings are not configured correctly"
 } && save_step
 
-step="[11|14]: Unifying appearance of GNOME applications"
+step="[12|15]: Unifying appearance of GNOME applications"
 run_the_step && {
   (
     set -e
@@ -499,11 +500,20 @@ EOF
   ) || throw_err "Error while unifying appearance of GNOME applications"
 } && save_step
 
-step="[12|14]: Installing essential gnome extensions"
+step="[13|15]: Installing essential gnome extensions"
 run_the_step && {
-  ydotoold &
-  sleep 1
-  ext_install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection || throw_err "Error while installing gnome extensions"
+  sudo systemctl enable --now ydotool.service
+  daemon_ready=0
+  for _ in $(seq 1 30); do
+    if systemctl is-active --quiet ydotool.service && [ -S /tmp/.ydotool_socket ]; then
+      daemon_ready=1
+      break
+    fi
+    sleep 1
+  done
+  [ "$daemon_ready" -eq 1 ] || throw_err "ydotoold daemon failed to start ydotool.service"
+
+  ext_install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection dash-to-dock@micxgx.gmail.com || throw_err "Error while installing gnome extensions"
 } && save_step
 
 step="Copying wallpapers and cursor files"
@@ -523,87 +533,56 @@ step="Initialising steam"
   steam -silent > /dev/null 2>&1 & disown
 } && save_step
 
-# NOT SURE IF THATS NEEDED AT ALL FOR THIS SCRIPT - very biased
-# step="[13|14]: Setting up look of your desktop"; log_step
-# SELECTED_LOOK=$(yad --list --radiolist \
-#   --title="Desktop Look" \
-#   --text="Choose the look of your desktop:" \
-#   --column="" --column="Look" \
-#   FALSE "macos" \
-#   FALSE "windows" \
-#   TRUE "linux" \
-#   --width=400 \
-#   --height=400)
-
 PROGRAMS=$(yad --list --checklist \
   --title="Programs to install" \
   --text="Select programs then click OK:" \
   --column="Install:CHK" \
   --column="ID" \
   --column="Description" \
+  --column="Type:TEXT" \
+  --print-column=2 \
+  --expand-column=3 \
   --separator=" " \
-  FALSE "color-picker"    "Color Picker (GNOME Extension)" \
-  FALSE "rounded-corners" "Rounded Window Corners (GNOME Extension)" \
-  FALSE "hidetopbar"      "Hide Top Bar (GNOME Extension)" \
-  FALSE "vitals"          "Vitals - system monitor" \
-  FALSE "youtube-music"   "YouTube Music App" \
-  FALSE "vicinae"         "Vicinae - app launcher &amp; clipboard manager" \
-  FALSE "obs-hotkeys"     "Fix OBS recording hotkeys (you want this if you will record with OBS)" \
-  FALSE "minecraft"       "Minecraft (FREE VERSION)" \
+  FALSE "desktop-icons"    "Enables Desktop Icons (GNOME Extension)"                               "<b><span foreground='#3584e4'>Extension</span></b>" \
+  FALSE "color-picker"     "Color Picker (GNOME Extension)"                                        "<b><span foreground='#3584e4'>Extension</span></b>" \
+  FALSE "update-indicator" "Updates indicator in top panel (GNOME Extension)"                      "<b><span foreground='#3584e4'>Extension</span></b>" \
+  FALSE "audio-panel"      "Separate audio control in quick settings panel (GNOME Extension)"      "<b><span foreground='#3584e4'>Extension</span></b>" \
+  FALSE "hidetopbar"       "Hide Top Bar (GNOME Extension)"                                        "<b><span foreground='#3584e4'>Extension</span></b>" \
+  FALSE "vitals"           "System monitor in top panel (GNOME Extension)"                         "<b><span foreground='#3584e4'>Extension</span></b>" \
+  
+  FALSE "youtube-music"    "Best YouTube Music App for Linux"                                      "<b><span foreground='#33d17a'>App</span></b>"       \
+  FALSE "vicinae"          "Vicinae - app launcher &amp; clipboard manager"                        "<b><span foreground='#33d17a'>App</span></b>"       \
+  FALSE "obs-hotkeys"      "Fix OBS recording hotkeys (you want this if you will record with OBS)" "<b><span foreground='#33d17a'>App</span></b>"       \
+  FALSE "minecraft"        "Minecraft (FREE VERSION)"                                              "<b><span foreground='#33d17a'>App</span></b>"       \
   --width=800 \
   --height=400)
 
 selected() { echo "$PROGRAMS" | grep -qw "$1"; }
 
-case "$SELECTED_LOOK" in
-  "TRUE|windows|")
-    WALLPAPER_NAME="${WALLPAPER_FILENAMES[0]}"
-    (
-      set -e
-      ext_install arcmenu@arcmenu.com gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
-      step="Pre-configure win extensions"
-      ! is_step_done && {
-        dconf load "$DTP_CONF_PATH" < "$PROJECT_DIR/data/dash-to-panel.conf"
-        dconf load "$ARC_MENU_CONF_PATH" < "$PROJECT_DIR/data/arcmenu.conf"
-      } && save_step
-      ext_disable dash-to-dock@micxgx.gmail.com hidetopbar@mathieu.bidon.ca
-    ) || echo "$(warn "Failed to set 'windows' style. Try again")"
-    ;;
-  "TRUE|macos|")
-    WALLPAPER_NAME="${WALLPAPER_FILENAMES[1]}"
-    (
-      set -e
-      ext_install dash-to-dock@micxgx.gmail.com
-      ext_disable arcmenu@arcmenu.com gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com
-    ) || echo "$(warn "Failed to set 'macos' style. Try again")"
-    ;;
-  "TRUE|linux|")
-    WALLPAPER_NAME="${WALLPAPER_FILENAMES[2]}"
-    (
-      set -e
-      ext_disable gtk4-ding@smedius.gitlab.com dash-to-panel@jderose9.github.com dash-to-dock@micxgx.gmail.com arcmenu@arcmenu.com
-    ) || echo "$(warn "Failed to set 'linux' style. Try again")"
-    ;;
-esac
-
-[ -n "$SELECTED_LOOK" ] && {
-  WALLPAPER="file://$WALLPAPERS_DIR/${WALLPAPER_NAME:-${WALLPAPER_FILENAMES[2]}}"
+step="Setting up background"
+! is_step_done && {
+  WALLPAPER="file://$WALLPAPERS_DIR/${WALLPAPER_FILENAMES[1]}"
   gsettings set org.gnome.desktop.background picture-uri "$WALLPAPER"
   gsettings set org.gnome.desktop.background picture-uri-dark "$WALLPAPER"
-}
+} && save_step
 
-step="[14|14]: Installing selected programs"; log_step
+step="[14|15]: Installing selected programs"; log_step
 (
   set -e
+  if selected "desktop-icons"; then
+    ext_install ding@rastersoft.com add-to-desktop@tommimon.github.com
+  fi
   if selected "color-picker"; then
     ext_install color-picker@tuberry
   fi
-  if selected "rounded-corners"; then
-    ext_install rounded-window-corners@fxgn
+  if selected "update-indicator"; then
+    ext_install update-extension@purejava.org
+  fi
+  if selected "audio-panel"; then
+    ext_install quick-settings-audio-panel@rayzeq.github.io
   fi
   if selected "hidetopbar"; then
     ext_install hidetopbar@mathieu.bidon.ca
-    ext_disable hidetopbar@mathieu.bidon.ca
   fi
   if selected "vitals"; then
     ext_install Vitals@CoreCoding.com
