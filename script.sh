@@ -42,6 +42,7 @@ DNF_PKGS=(
   "adw-gtk3-theme"
   "ydotool"
   "steam|com.valvesoftware.Steam"
+  "xdg-terminal-exec"
 )
 FLATHUB_PKGS=(
   "com.mattjakeman.ExtensionManager|gnome-extensions-manager"
@@ -296,24 +297,6 @@ EOF
     echo -e 'default_sched = "scx_lavd"\ndefault_mode = "Gaming"' | sudo tee "$SCX_LOADER_CONF" > /dev/null
 
     sudo grubby --update-kernel=ALL --args="amdgpu.sg_display=0"
-
-    if lspci | grep -q "RTL8852BE"; then
-      sudo tee /usr/lib/systemd/system-sleep/unload-realtek.sh > /dev/null << 'EOF'
-#!/bin/sh
-case "$1" in
-    pre)
-        scxctl stop
-        /usr/sbin/modprobe -r rtw89_8852be btusb
-        ;;
-    post)
-        /usr/sbin/modprobe rtw89_8852be btusb
-        scxctl start --sched lavd --mode gaming || scxctl switch --sched lavd --mode gaming
-        ;;
-esac
-EOF
-
-      sudo chmod +x /usr/lib/systemd/system-sleep/unload-realtek.sh
-    fi
   ) || throw_err "Error while installing cachyos kernel"
 } && save_step
 
@@ -502,16 +485,35 @@ EOF
 
 step="[13|15]: Installing essential gnome extensions"
 run_the_step && {
-  sudo systemctl enable --now ydotool.service
+  mkdir -p "$SERVICE_DIR"
+  cat > "$SERVICE_DIR/ydotoold.service" <<EOF
+[Unit]
+Description=ydotoold daemon for ydotool
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ydotoold
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+  systemctl --user daemon-reload
+  systemctl --user enable ydotoold.service
+  systemctl --user restart ydotoold.service
+  yd_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/.ydotool_socket"
   daemon_ready=0
   for _ in $(seq 1 30); do
-    if systemctl is-active --quiet ydotool.service && [ -S /tmp/.ydotool_socket ]; then
+    if systemctl --user is-active --quiet ydotoold.service && [ -S "$yd_socket" ]; then
       daemon_ready=1
       break
     fi
     sleep 1
   done
-  [ "$daemon_ready" -eq 1 ] || throw_err "ydotoold daemon failed to start ydotool.service"
+  [ "$daemon_ready" -eq 1 ] || throw_err "ydotoold daemon failed to start (missing $yd_socket)"
 
   ext_install appindicatorsupport@rgcjonas.gmail.com quick-lang-switch@ankostis.gmail.com blur-my-shell@aunetx just-perfection-desktop@just-perfection dash-to-dock@micxgx.gmail.com || throw_err "Error while installing gnome extensions"
 } && save_step
@@ -545,16 +547,14 @@ PROGRAMS=$(yad --list --checklist \
   --separator=" " \
   FALSE "desktop-icons"    "Enables Desktop Icons (GNOME Extension)"                               "<b><span foreground='#3584e4'>Extension</span></b>" \
   FALSE "color-picker"     "Color Picker (GNOME Extension)"                                        "<b><span foreground='#3584e4'>Extension</span></b>" \
-  FALSE "update-indicator" "Updates indicator in top panel (GNOME Extension)"                      "<b><span foreground='#3584e4'>Extension</span></b>" \
   FALSE "audio-panel"      "Separate audio control in quick settings panel (GNOME Extension)"      "<b><span foreground='#3584e4'>Extension</span></b>" \
   FALSE "hidetopbar"       "Hide Top Bar (GNOME Extension)"                                        "<b><span foreground='#3584e4'>Extension</span></b>" \
   FALSE "vitals"           "System monitor in top panel (GNOME Extension)"                         "<b><span foreground='#3584e4'>Extension</span></b>" \
-  
   FALSE "youtube-music"    "Best YouTube Music App for Linux"                                      "<b><span foreground='#33d17a'>App</span></b>"       \
   FALSE "vicinae"          "Vicinae - app launcher &amp; clipboard manager"                        "<b><span foreground='#33d17a'>App</span></b>"       \
   FALSE "obs-hotkeys"      "Fix OBS recording hotkeys (you want this if you will record with OBS)" "<b><span foreground='#33d17a'>App</span></b>"       \
   FALSE "minecraft"        "Minecraft (FREE VERSION)"                                              "<b><span foreground='#33d17a'>App</span></b>"       \
-  --width=800 \
+  --width=900 \
   --height=400)
 
 selected() { echo "$PROGRAMS" | grep -qw "$1"; }
@@ -574,9 +574,6 @@ step="[14|15]: Installing selected programs"; log_step
   fi
   if selected "color-picker"; then
     ext_install color-picker@tuberry
-  fi
-  if selected "update-indicator"; then
-    ext_install update-extension@purejava.org
   fi
   if selected "audio-panel"; then
     ext_install quick-settings-audio-panel@rayzeq.github.io
